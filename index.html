@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>MATHS FIST – Times Table Tournament</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Press+Start+2P&family=Russo+One&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="crt"></div>
+
+  <button id="mute" class="icon-btn" title="Sound on/off"></button>
+
+  <!-- ============ TITLE / ATTRACT ============ -->
+  <section id="title" class="screen hidden">
+    <div id="title-logo" class="title-panel">
+      <h1 class="logo"><span class="l1">MATHS</span><span class="l2">FIST</span></h1>
+      <div class="subtitle">TIMES TABLE TOURNAMENT</div>
+      <div class="press blink">PRESS START</div>
+    </div>
+    <div id="title-scores" class="title-panel hidden">
+      <h2 class="pixel-h">TODAY'S BEST FIGHTERS</h2>
+      <ol id="title-score-list" class="score-list"></ol>
+      <div class="press blink">PRESS START</div>
+    </div>
+    <div id="title-howto" class="title-panel hidden">
+      <h2 class="pixel-h">HOW TO FIGHT</h2>
+      <ul class="howto">
+        <li><b>ANSWER</b> the times table to <b>ATTACK</b></li>
+        <li>Answer <b>FAST</b> for <b>COMBOS</b> &amp; <b>BIG HITS</b></li>
+        <li>Too slow? The enemy strikes when its <b>FUSE</b> burns out!</li>
+        <li>Fill your <b>SUPER</b> meter, press <b>SPACE</b> for a <b>SUPER RUSH</b></li>
+        <li>Enemy super? Answer quick to <b>PARRY!</b></li>
+        <li><b>MASTER</b> your times tables to <b>UNLOCK 13 SECRET FIGHTERS!</b></li>
+      </ul>
+      <div class="press blink">PRESS START</div>
+    </div>
+    <div class="demo-tag blink">DEMO PLAY</div>
+    <div class="credits"><span>© 1998 MATHS FIST</span><span id="credit-count">CREDIT 01</span></div>
+  </section>
+
+  <!-- ============ OPTIONS ============ -->
+  <section id="options" class="screen hidden">
+    <div class="panel setup-panel">
+      <h2>FIGHT SETTINGS</h2>
+      <div class="setup-grid">
+        <div class="setup-block">
+          <h3>Times tables</h3>
+          <div id="tables" class="tables"></div>
+          <div class="presets">
+            <button data-preset="all">All</button>
+            <button data-preset="none">Clear</button>
+            <button data-preset="2,5,10">2, 5, 10</button>
+            <button data-preset="3,4,8">3, 4, 8</button>
+            <button data-preset="6,7,9">6, 7, 9</button>
+            <button data-preset="11,12">11, 12</button>
+          </div>
+          <h3>Question types</h3>
+          <div id="types" class="chips"></div>
+          <h3>Numbers go up to</h3>
+          <div id="maxfactor" class="chips">
+            <button data-v="10">× 10</button>
+            <button data-v="12">× 12</button>
+          </div>
+        </div>
+        <div class="setup-block">
+          <h3>Difficulty</h3>
+          <div id="difficulty" class="diffs"></div>
+          <h3>Rounds per fight</h3>
+          <div id="rounds" class="chips">
+            <button data-v="1">1 round</button>
+            <button data-v="2">Best of 3</button>
+          </div>
+          <h3>Gore</h3>
+          <div id="gore" class="chips">
+            <button data-v="0">Off</button>
+            <button data-v="1">Arcade</button>
+            <button data-v="2">Extreme</button>
+          </div>
+        </div>
+      </div>
+      <div class="setup-footer">
+        <span id="setup-error"></span>
+        <button id="options-back" class="big-btn alt">BACK</button>
+        <button id="options-next" class="big-btn">SELECT FIGHTER ▶</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHARACTER SELECT ============ -->
+  <section id="select" class="screen hidden">
+    <div class="select-head"><span>PLAYER SELECT</span><span id="select-timer" class="pixel">20</span></div>
+    <div id="sel-count" class="sel-count pixel"></div>
+    <div class="select-info">
+      <div id="sel-name" class="sel-name">KAI</div>
+      <div id="sel-style" class="sel-style">KARATE</div>
+      <div class="sel-stats" id="sel-stats"></div>
+      <div class="sel-special">SUPER: <span id="sel-special"></span></div>
+      <div id="sel-lock" class="sel-lock hidden"></div>
+    </div>
+    <div id="select-grid" class="select-grid"></div>
+    <div class="select-hint">← → to choose · ENTER / tap to fight</div>
+  </section>
+
+  <!-- ============ VS ============ -->
+  <section id="vs" class="screen hidden">
+    <div class="vs-half left"><img id="vs-p1" alt="" /><div id="vs-p1-name" class="vs-name"></div></div>
+    <div class="vs-half right"><img id="vs-p2" alt="" /><div id="vs-p2-name" class="vs-name"></div></div>
+    <div class="vs-text">VS</div>
+    <div id="vs-stage" class="vs-stage"></div>
+    <div id="vs-round" class="vs-round"></div>
+  </section>
+
+  <!-- ============ WARNING (boss) ============ -->
+  <section id="warning" class="screen hidden">
+    <div class="warn-stripes top"></div>
+    <div class="warn-text">WARNING!</div>
+    <div class="warn-sub">A NEW CHALLENGER APPROACHES</div>
+    <div class="warn-stripes bottom"></div>
+  </section>
+
+  <!-- ============ HUD ============ -->
+  <section id="hud" class="hidden">
+    <div id="letterbox"><div class="lb top"></div><div class="lb bottom"></div></div>
+    <div id="splatter"></div>
+    <div id="hurt"></div>
+
+    <div class="topbar">
+      <div class="side p1">
+        <img id="hud-p1-face" class="face" alt="" />
+        <div class="barwrap">
+          <div class="bar"><div class="trail" id="p1-trail"></div><div class="fill" id="p1-fill"></div><div class="shine"></div></div>
+          <div class="nameline"><span id="p1-name"></span><span class="wins" id="p1-wins"></span></div>
+        </div>
+      </div>
+      <div class="center-box">
+        <div id="timer" class="timer">60</div>
+      </div>
+      <div class="side p2">
+        <div class="barwrap">
+          <div class="bar"><div class="trail" id="p2-trail"></div><div class="fill" id="p2-fill"></div><div class="shine"></div></div>
+          <div class="nameline"><span class="wins" id="p2-wins"></span><span id="p2-name"></span></div>
+        </div>
+        <img id="hud-p2-face" class="face" alt="" />
+      </div>
+    </div>
+    <div class="scoreline pixel"><span>1P <b id="score">0000000</b></span><span>HI <b id="hiscore">0000000</b></span></div>
+
+    <div id="combo" class="combo hidden"><div class="combo-n" id="combo-n">0</div><div class="combo-hits">HITS</div><div class="combo-label" id="combo-label"></div></div>
+
+    <div id="qpanel" class="qpanel hidden">
+      <div id="qtag" class="qtag"></div>
+      <div id="qtext" class="qtext"></div>
+      <div class="fuse-row">
+        <img id="fuse-face" class="fuse-face" alt="" />
+        <div class="fuse"><div id="fuse-fill"></div><div id="fuse-spark" class="fuse-spark"></div></div>
+        <span id="qtime" class="qtime pixel">0.0</span>
+      </div>
+    </div>
+
+    <div id="rushbar" class="rushbar hidden"><div class="rush-title">SUPER RUSH!</div><div class="rush-track"><div id="rush-fill"></div></div></div>
+
+    <div class="meters">
+      <div class="meter p1"><div class="meter-label">SUPER</div><div class="meter-bar"><div id="m1-fill"></div></div></div>
+      <div class="meter p2"><div class="meter-bar"><div id="m2-fill"></div></div><div class="meter-label">SUPER</div></div>
+    </div>
+    <button id="super-btn" class="super-btn hidden">SUPER! <small>SPACE</small></button>
+
+    <div id="popups"></div>
+    <div id="cutin" class="cutin hidden"><div class="cutin-stripes"></div><img id="cutin-img" alt="" /><div class="cutin-text"><div id="cutin-name"></div><div id="cutin-move"></div></div></div>
+    <div id="banner" class="banner"></div>
+    <div id="subbanner" class="subbanner"></div>
+    <div id="replay-tag" class="replay-tag hidden">● REPLAY</div>
+
+    <div id="tally" class="tally hidden"></div>
+
+    <div id="keypad" class="keypad hidden"></div>
+    <button id="keypad-toggle" class="icon-btn" title="Show/hide number pad"></button>
+    <button id="pause-btn" class="icon-btn" title="Pause"></button>
+  </section>
+
+  <!-- ============ CONTINUE ============ -->
+  <section id="continue" class="screen hidden">
+    <div class="cont-wrap">
+      <img id="cont-face" alt="" />
+      <div class="cont-title">CONTINUE?</div>
+      <div id="cont-count" class="cont-count">9</div>
+      <button id="cont-yes" class="big-btn">YES! <small>ENTER</small></button>
+    </div>
+  </section>
+
+  <!-- ============ GAME OVER ============ -->
+  <section id="gameover" class="screen hidden"><div class="gameover-text">GAME OVER</div></section>
+
+  <!-- ============ ENDING ============ -->
+  <section id="ending" class="screen hidden">
+    <div class="ending-wrap">
+      <div class="ending-small">CONGRATULATIONS!</div>
+      <div class="ending-big">YOU ARE THE<br />MATHS FIST<br />CHAMPION!</div>
+      <div id="ending-unlock" class="ending-unlock"></div>
+    </div>
+  </section>
+
+  <!-- ============ UNLOCK REVEAL ============ -->
+  <section id="unlock" class="screen hidden">
+    <div class="unlock-rays"></div>
+    <div class="unlock-wrap">
+      <div class="unlock-title">NEW CHALLENGER UNLOCKED!</div>
+      <img id="unlock-img" alt="" />
+      <div id="unlock-name" class="unlock-name"></div>
+      <div id="unlock-style" class="unlock-style"></div>
+      <div id="unlock-why" class="unlock-why"></div>
+    </div>
+  </section>
+
+  <!-- ============ NAME ENTRY ============ -->
+  <section id="names" class="screen hidden">
+    <div class="panel small names-panel">
+      <h2>NEW HIGH SCORE!</h2>
+      <div id="names-score" class="pixel names-score"></div>
+      <div class="names-slots"><span id="ns0">A</span><span id="ns1">_</span><span id="ns2">_</span></div>
+      <div id="names-grid" class="names-grid"></div>
+      <div class="names-timer pixel" id="names-timer">20</div>
+    </div>
+  </section>
+
+  <!-- ============ RESULTS ============ -->
+  <section id="results" class="screen hidden">
+    <div class="panel results-panel">
+      <h2 id="res-title">RESULTS</h2>
+      <div id="res-stats" class="stats"></div>
+      <h3>Tables report</h3>
+      <div id="res-tables" class="res-tables"></div>
+      <h3 id="res-practise-h">Practise these</h3>
+      <div id="res-practise" class="practise"></div>
+      <h3 id="res-unlocks-h" class="hidden">New fighters unlocked!</h3>
+      <div id="res-unlocks" class="res-unlocks"></div>
+      <div id="res-next" class="res-next"></div>
+      <h3>High scores</h3>
+      <ol id="res-scores" class="score-list small"></ol>
+      <div class="setup-footer">
+        <button id="res-title-btn" class="big-btn alt">TITLE</button>
+        <button id="res-again" class="big-btn">PLAY AGAIN</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAUSE ============ -->
+  <section id="pause" class="screen hidden">
+    <div class="panel small">
+      <h2>PAUSED</h2>
+      <button id="resume-btn" class="big-btn">RESUME</button>
+      <button id="quit-btn" class="big-btn alt">QUIT</button>
+    </div>
+  </section>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

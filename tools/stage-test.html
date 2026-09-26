@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Stage test</title>
+  <style>
+    html, body { margin: 0; background: #000; overflow: hidden; }
+    canvas { width: 100vw; height: 100vh; display: block; image-rendering: pixelated; }
+    #info { position: fixed; left: 8px; top: 8px; color: #0f0; font: 12px monospace; background: rgba(0,0,0,.6); padding: 4px 6px; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="info"></div>
+  <script type="module">
+    // Dev-only stage viewer: /tools/stage-test.html?stage=neon&cam=fight|orbit&angle=0.6&flash=1
+    import * as THREE from 'three';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+    import { createStage, STAGE_ORDER } from '/src/stages.js';
+    import { lambert, SNAP } from '/src/ps1.js';
+
+    const q = new URLSearchParams(location.search);
+    const id = q.get('stage') || 'temple';
+    const camMode = q.get('cam') || 'fight';
+    const fixedAngle = q.has('angle') ? +q.get('angle') : null;
+
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+    renderer.setPixelRatio(1);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 250);
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.9, 0.4, 0.8);
+    if (q.get('bloom') !== '0') composer.addPass(bloom);
+    composer.addPass(new OutputPass());
+
+    function resize() {
+      const w = innerWidth, h = innerHeight;
+      const s = Math.max(1, h / 380);
+      const iw = Math.round(w / s), ih = Math.round(h / s);
+      renderer.setSize(iw, ih, false);
+      composer.setSize(iw, ih);
+      camera.aspect = w / h;
+      camera.fov = camera.aspect < 1 ? 62 : 40;
+      camera.updateProjectionMatrix();
+      SNAP.value.set(iw * 0.35, ih * 0.35);
+    }
+    addEventListener('resize', resize);
+    resize();
+
+    // Placeholder fighters (~1.9 tall) at x = ±0.95
+    const dummies = new THREE.Group();
+    for (const [x, col] of [[-0.95, 0xf0ede4], [0.95, 0x23b7ac]]) {
+      const g = new THREE.Group();
+      const add = (w, h, d, y, c) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), lambert(c)); m.position.y = y; g.add(m); };
+      add(0.36, 0.9, 0.22, 0.45, 0x333355);
+      add(0.46, 0.6, 0.26, 1.25, col);
+      add(0.21, 0.25, 0.23, 1.72, 0xe0a476);
+      g.position.x = x;
+      dummies.add(g);
+    }
+    scene.add(dummies);
+
+    let stage = createStage(id, scene);
+    let last = performance.now();
+    let t = 0;
+    function frame() {
+      requestAnimationFrame(frame);
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      t += dt;
+      stage?.update(dt, t);
+      if (camMode === 'orbit') {
+        const a = fixedAngle ?? t * 0.3;
+        camera.position.set(Math.sin(a) * 5.5, 1.6, Math.cos(a) * 5.5);
+        camera.lookAt(0, 1.0, 0);
+      } else {
+        camera.position.set(Math.sin(t * 0.35) * 0.25, 1.55, camera.aspect < 1 ? 6 : 5.3);
+        camera.lookAt(0, 1.2, 0);
+      }
+      composer.render();
+    }
+    frame();
+    if (q.has('flash')) setTimeout(() => stage.flash(+q.get('flash') || 1), 900);
+
+    window.__stageTest = {
+      stages: STAGE_ORDER,
+      measure() { renderer.info.reset(); renderer.info.autoReset = false; renderer.render(scene, camera); const c = renderer.info.render.calls; renderer.info.autoReset = true; return c; },
+      disposeCheck() {
+        stage.dispose();
+        stage = null;
+        scene.remove(dummies);
+        const left = scene.children.length;
+        return { left, fog: scene.fog, bg: scene.background };
+      },
+    };
+    document.getElementById('info').textContent = `${id} / ${camMode}`;
+  </script>
+</body>
+</html>

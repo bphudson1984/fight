@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Music test</title>
+  <style>
+    body { font: 14px system-ui, sans-serif; background: #111; color: #eee; padding: 16px; }
+    button { margin: 3px; padding: 6px 12px; }
+    pre { background: #000; padding: 10px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Maths Fist – music test</h1>
+  <div id="songs"></div>
+  <div id="jingles"></div>
+  <p>
+    <button id="stop">Stop</button>
+    Tempo <input id="tempo" type="range" min="0.8" max="1.3" step="0.01" value="1" /> <span id="tv">1.00</span>
+    <button id="analyze">Offline analysis</button>
+  </p>
+  <pre id="out"></pre>
+  <script type="module">
+    import { music, SONG_IDS, JINGLE_IDS } from '/src/audio/music.js';
+    import { Sequencer, compileSong } from '/src/audio/sequencer.js';
+    import { SONGS, JINGLES } from '/src/audio/songs.js';
+    import { makeIR } from '/src/audio/core.js';
+
+    const out = document.getElementById('out');
+    const log = (s) => { out.textContent += s + '\n'; };
+
+    for (const id of SONG_IDS) {
+      const b = document.createElement('button');
+      b.textContent = '▶ ' + id;
+      b.onclick = () => music.play(id);
+      document.getElementById('songs').appendChild(b);
+    }
+    for (const id of JINGLE_IDS) {
+      const b = document.createElement('button');
+      b.textContent = '♪ ' + id;
+      b.onclick = async () => { const ok = await music.jingle(id); log(`jingle ${id} finished: ${ok}`); };
+      document.getElementById('jingles').appendChild(b);
+    }
+    document.getElementById('stop').onclick = () => music.stop();
+    document.getElementById('tempo').oninput = (e) => {
+      music.setTempoScale(+e.target.value);
+      document.getElementById('tv').textContent = (+e.target.value).toFixed(2);
+    };
+
+    function songLength(song) {
+      const comp = compileSong(song);
+      const steps = [...comp.intro, ...comp.loop].reduce((a, e) => a + comp.patterns[e.name].steps, 0);
+      return steps * 60 / song.bpm / 4;
+    }
+
+    function db(x) { return x > 0 ? (20 * Math.log10(x)).toFixed(1) : '-inf'; }
+
+    async function renderOne(song, loop, secs, sr = 44100) {
+      const oc = new OfflineAudioContext(2, Math.ceil(sr * secs), sr);
+      const musicBus = oc.createGain();
+      musicBus.gain.value = 0.5; // same as core.js music bus
+      musicBus.connect(oc.destination);
+      const conv = oc.createConvolver();
+      conv.buffer = makeIR(oc, 2.0, 3.2);
+      const ret = oc.createGain();
+      ret.gain.value = 0.35;
+      conv.connect(ret).connect(oc.destination);
+      const send = oc.createGain();
+      send.connect(conv);
+      const seq = new Sequencer(oc, musicBus, send).load(song, { loop });
+      seq.start(0.05, { realtime: false });
+      seq.scheduleUntil(secs - 0.2);
+      return oc.startRendering();
+    }
+
+    function analyze(buf) {
+      const L = buf.getChannelData(0);
+      const R = buf.getChannelData(1);
+      const sr = buf.sampleRate;
+      let peak = 0, sum = 0, nan = 0;
+      let lo = 0, hi = 0, lpL = 0, lpH = 0;
+      const aL = 1 - Math.exp(-2 * Math.PI * 150 / sr);
+      const aH = 1 - Math.exp(-2 * Math.PI * 4000 / sr);
+      let sLo = 0, sMid = 0, sHi = 0;
+      const win = sr;
+      let wSum = 0, wN = 0, quietWins = 0, wins = 0;
+      for (let i = 0; i < L.length; i++) {
+        const x = (L[i] + R[i]) * 0.5;
+        if (Number.isNaN(L[i]) || Number.isNaN(R[i])) { nan++; continue; }
+        const p = Math.max(Math.abs(L[i]), Math.abs(R[i]));
+        if (p > peak) peak = p;
+        sum += x * x;
+        lpL += aL * (x - lpL);
+        lpH += aH * (x - lpH);
+        sLo += lpL * lpL;
+        sHi += (x - lpH) * (x - lpH);
+        sMid += (lpH - lpL) * (lpH - lpL);
+        wSum += x * x; wN++;
+        if (wN === win) { wins++; if (Math.sqrt(wSum / wN) < 0.003) quietWins++; wSum = 0; wN = 0; }
+      }
+      const n = L.length;
+      return {
+        peak: peak.toFixed(3), rms: db(Math.sqrt(sum / n)),
+        lo: db(Math.sqrt(sLo / n)), mid: db(Math.sqrt(sMid / n)), hi: db(Math.sqrt(sHi / n)),
+        nan, quietWins: `${quietWins}/${wins}`,
+      };
+    }
+
+    async function analyzeAll() {
+      const results = {};
+      const all = [
+        ...Object.entries(SONGS).map(([id, s]) => [id, s, true, Math.min(24, songLength(s) + 2)]),
+        ...Object.entries(JINGLES).map(([id, s]) => [id, s, false, songLength(s) + 1.5]),
+      ];
+      for (const [id, song, loop, secs] of all) {
+        const warnings = compileSong(song).warnings;
+        try {
+          const buf = await renderOne(song, loop, secs);
+          results[id] = { secs: +secs.toFixed(1), len: +songLength(song).toFixed(1), ...analyze(buf), warnings };
+        } catch (e) {
+          results[id] = { error: String(e && e.stack || e), warnings };
+        }
+        log(`${id}: ${JSON.stringify(results[id])}`);
+      }
+      return results;
+    }
+    window.analyzeAll = analyzeAll;
+    // Solo each track of a song and report its RMS (dBFS) over ~12 s.
+    window.trackLevels = async (id, from = 0, secsMax = 14) => {
+      const song = SONGS[id] || JINGLES[id];
+      const res = {};
+      for (const tk of Object.keys(song.tracks)) {
+        const solo = { ...song, _compiled: undefined, tracks: Object.fromEntries(Object.entries(song.tracks).map(([k, d]) => [k, k === tk ? d : { ...d, vol: 0 }])) };
+        const secs = Math.min(secsMax, songLength(song) + 1);
+        const buf = await renderOne(solo, !!SONGS[id], secs, 22050);
+        if (from > 0) {
+          const sr = buf.sampleRate, start = Math.floor(from * sr);
+          const cut = new AudioBuffer({ length: buf.length - start, numberOfChannels: 2, sampleRate: sr });
+          for (let ch = 0; ch < 2; ch++) cut.copyToChannel(buf.getChannelData(ch).subarray(start), ch);
+          res[tk] = analyze(cut).rms;
+        } else res[tk] = analyze(buf).rms;
+      }
+      return res;
+    };
+    window.liveTest = async () => {
+      const log = [];
+      music.play('title'); log.push('play title -> ' + music.current);
+      await new Promise((r) => setTimeout(r, 1500));
+      music.setTempoScale(1.12); log.push('tempo 1.12');
+      await new Promise((r) => setTimeout(r, 800));
+      music.play('title'); log.push('replay same (no-op) -> ' + music.current);
+      music.play('neon'); log.push('switch -> ' + music.current);
+      await new Promise((r) => setTimeout(r, 800));
+      const t0 = performance.now();
+      const ok = await music.jingle('stageclear');
+      log.push(`jingle stageclear resolved ${ok} after ${((performance.now() - t0) / 1000).toFixed(2)}s, current=${music.current}`);
+      const p = music.jingle('victory');
+      music.play('boss');
+      log.push('interrupted jingle resolved ' + (await p) + ', current=' + music.current);
+      music.stop(0.2);
+      log.push('stopped -> ' + music.current);
+      music.setTempoScale(1);
+      return log;
+    };
+    window.renderToWav = async (id) => {
+      const song = SONGS[id] || JINGLES[id];
+      const buf = await renderOne(song, !!SONGS[id], Math.min(20, songLength(song) + 1.5), 22050);
+      const L = buf.getChannelData(0), R = buf.getChannelData(1);
+      const pcm = new Int16Array(L.length * 2);
+      for (let i = 0; i < L.length; i++) {
+        pcm[i * 2] = Math.max(-1, Math.min(1, L[i])) * 32767;
+        pcm[i * 2 + 1] = Math.max(-1, Math.min(1, R[i])) * 32767;
+      }
+      let s = '';
+      const bytes = new Uint8Array(pcm.buffer);
+      for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      return btoa(s);
+    };
+    document.getElementById('analyze').onclick = analyzeAll;
+    window.__ready = true;
+  </script>
+</body>
+</html>
