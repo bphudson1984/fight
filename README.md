@@ -22,11 +22,30 @@ BASE_URL=http://localhost:56432 npm test   # …or against a running container
 ## Deploy
 
 Merging to `main` builds, tests and publishes `ghcr.io/bphudson1984/maths-fist` (`latest` + `sha-<short>`).
-On a server, copy `deploy/docker-compose.yml` over and run:
+The image is public, so no `docker login` is needed.
+
+### Add it to a server's Docker environment
+
+Add this service to the `services:` section of the server's `docker-compose.yml` (or use `deploy/docker-compose.yml`
+as-is):
+
+```yaml
+  maths-fist:
+    image: ghcr.io/bphudson1984/maths-fist:latest
+    container_name: maths-fist
+    restart: unless-stopped
+    ports:
+      - "56432:8080"
+```
+
+Then start it:
 
 ```bash
-docker compose pull && docker compose up -d   # game on http://<host>:56432/
+docker compose pull maths-fist && docker compose up -d maths-fist   # game on http://<host>:56432/
 ```
+
+To update after a new release, run the same two commands again. To pin a version, swap `latest` for a
+`sha-<short>` tag. Change `56432` if that host port is taken; the container always listens on 8080.
 
 The image is static files behind unprivileged nginx (health check at `/healthz`), with fonts bundled so it works
 offline. There's no backend and no volume: scores and progress live in each browser's local storage.
