@@ -1,0 +1,13 @@
+# Local: build from source and run on http://localhost:56432/
+#   docker compose up --build
+# Servers pull the published image instead; see deploy/docker-compose.yml.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: maths-fist:local
+    container_name: maths-fist
+    restart: unless-stopped
+    ports:
+      - "56432:8080"
