@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+// Fonts are bundled (not Google Fonts) so the game works on offline school networks.
+import '@fontsource/bangers/400.css';
+import '@fontsource/press-start-2p/400.css';
+import '@fontsource/russo-one/400.css';
 import './style.css';
 import { SNAP } from './ps1.js';
 import { Q, setQuality } from './quality.js';

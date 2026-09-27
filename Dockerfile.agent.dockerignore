@@ -1,0 +1,5 @@
+# BuildKit uses this instead of the root .dockerignore when building
+# Dockerfile.agent. It only needs package*.json to pin Playwright's version.
+*
+!package.json
+!package-lock.json

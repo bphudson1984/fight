@@ -1,0 +1,7 @@
+# App image build context: allow-list only what docker/Dockerfile copies.
+*
+!package.json
+!package-lock.json
+!index.html
+!src/
+!docker/nginx.conf

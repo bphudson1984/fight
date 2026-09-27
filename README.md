@@ -10,6 +10,27 @@ npm run dev      # open the printed URL
 npm run build    # static build in dist/
 ```
 
+Or with Docker (no Node needed): `docker compose up --build`, then open http://localhost:56432/.
+
+## Tests
+
+```bash
+npm test         # Playwright smoke tests (builds, then runs under vite preview)
+BASE_URL=http://localhost:56432 npm test   # …or against a running container
+```
+
+## Deploy
+
+Merging to `main` builds, tests and publishes `ghcr.io/bphudson1984/maths-fist` (`latest` + `sha-<short>`).
+On a server, copy `deploy/docker-compose.yml` over and run:
+
+```bash
+docker compose pull && docker compose up -d   # game on http://<host>:56432/
+```
+
+The image is static files behind unprivileged nginx (health check at `/healthz`), with fonts bundled so it works
+offline. There's no backend and no volume: scores and progress live in each browser's local storage.
+
 ## How it plays
 
 - **Insert coin → Press start → Fight settings → Player select → Arcade ladder**: 3 opponents on 3 stages, then the

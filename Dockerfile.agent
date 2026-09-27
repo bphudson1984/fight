@@ -1,0 +1,25 @@
+# Agent container for running Claude Code against the fight (MATHS FIST)
+# workspace. Extends the Claude Code base image (which ships Node) and adds
+# Playwright's Chromium and its system libraries so `npx playwright test`
+# works out of the box (the agent runs non-root and can't apt-get them).
+
+FROM ghcr.io/bphudson1984/claude-code:latest
+
+USER root
+ENV REPO_URL=git@github.com:bphudson1984/fight.git
+
+# Browsers go in a shared, world-readable path rather than root's
+# ~/.cache so the non-root agent user finds them. The Playwright version
+# comes from package-lock.json so the browser build matches what the
+# workspace's node_modules expects; bumping Playwright rebuilds this image
+# (package-lock.json is in docker-publish.yml's path filter).
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+COPY package.json package-lock.json /tmp/pw/
+RUN cd /tmp/pw \
+    && npm ci --ignore-scripts --no-audit --no-fund \
+    && npx playwright install --with-deps chromium \
+    && chmod -R a+rX /ms-playwright \
+    && cd / && rm -rf /tmp/pw /root/.npm \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace

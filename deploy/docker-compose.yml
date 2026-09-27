@@ -1,0 +1,10 @@
+# Server install: copy this file to the host, then
+#   docker compose pull && docker compose up -d
+# Game: http://<host>:56432/
+services:
+  app:
+    image: ghcr.io/bphudson1984/maths-fist:${MATHS_FIST_TAG:-latest}
+    container_name: maths-fist
+    restart: unless-stopped
+    ports:
+      - "56432:8080"
