@@ -489,3 +489,27 @@ button { font-family: inherit; cursor: pointer; }
   .sel-count { top: 70px; }
 }
 .sel-tile .tbadge, .res-table .mstar { font-family: var(--hud-font); font-size: 10px; letter-spacing: 0.5px; }
+
+/* ================================================================ QUALITY */
+body.hd #game { image-rendering: auto; }
+body.hd #crt { opacity: 0.45; }
+
+/* ================================================================ HUMILIATION */
+.banner.pink { color: #ff2ea6; -webkit-text-stroke: 4px #1a0010; filter: drop-shadow(0 0 30px rgba(255, 46, 166, 0.95)); }
+.subbanner.pink { color: #ff6ac8; text-shadow: 3px 3px 0 #5a0030, 6px 6px 0 #000; }
+.hum-err {
+  position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%) rotate(-2deg); z-index: 7;
+  background: #a8b890; color: #1a2014; border: 8px solid #2a2a2a; box-shadow: 0 0 0 4px #000, 0 0 40px rgba(255, 0, 60, 0.6);
+  padding: 18px 34px; text-align: center; font-family: var(--pixel-font); animation: errFlicker 0.14s steps(2) infinite;
+}
+.hum-err-big { font-size: clamp(28px, 5vw, 56px); }
+.hum-err-small { font-size: clamp(10px, 1.4vw, 14px); margin-top: 10px; }
+@keyframes errFlicker { 50% { transform: translate(calc(-50% + 4px), -50%) rotate(-1deg); filter: invert(1) hue-rotate(90deg); } }
+.side.p1 .bar.bonked { animation: barBonk 0.7s ease-in forwards; }
+@keyframes barBonk {
+  0% { transform: skew(-18deg); }
+  25% { transform: skew(-18deg) translateY(-8px) rotate(-6deg); }
+  100% { transform: skew(-18deg) translate(60px, 160px) rotate(35deg); opacity: 0; }
+}
+
+.replay-tag { white-space: nowrap; font-size: clamp(12px, 1.6vw, 22px); top: 12vh; }

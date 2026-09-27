@@ -35,6 +35,14 @@ export class CameraDirector {
 
   shake(a) { this.shakeAmt = Math.max(this.shakeAmt, a); }
 
+  /** Scripted shot: pos/look are Vector3s or functions of time returning one. */
+  shot(pos, look, follow = 6, cut = false) {
+    this.set('shot', { cut });
+    this.shotPos = pos;
+    this.shotLook = look;
+    this.shotFollow = follow;
+  }
+
   /** Track a flying object (e.g. a head) for `dur` seconds, then orbit `back`. */
   follow(obj, dur, back) {
     this.set('follow');
@@ -114,6 +122,14 @@ export class CameraDirector {
         _l.set((c.x + mid) / 2, 1.25, 0);
         follow = 12;
         if (t > 0.7) this.set(this.back || 'fight');
+        break;
+      }
+      case 'shot': {
+        const r = (v) => (typeof v === 'function' ? v(t) : v);
+        _p.copy(r(this.shotPos));
+        _l.copy(r(this.shotLook));
+        if (portrait) _p.sub(_l).multiplyScalar(1.35).add(_l);
+        follow = this.shotFollow;
         break;
       }
       case 'follow': {

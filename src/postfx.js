@@ -7,6 +7,19 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
+// Kills NaN/Inf pixels (e.g. from degenerate normals) before bloom spreads them.
+const SanitizeShader = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      if (!(c.r == c.r) || !(c.g == c.g) || !(c.b == c.b)) c = vec4(0.0, 0.0, 0.0, 1.0);
+      gl_FragColor = clamp(c, 0.0, 12.0);
+    }`,
+};
+
 const ArcadeShader = {
   uniforms: {
     tDiffuse: { value: null },
@@ -71,14 +84,16 @@ const ArcadeShader = {
 };
 
 export class PostFX {
-  constructor(renderer, scene, camera) {
+  constructor(renderer, scene, camera, { samples = 0 } = {}) {
     this.renderer = renderer;
-    this.composer = new EffectComposer(renderer);
+    const rt = new THREE.WebGLRenderTarget(320, 240, { type: THREE.HalfFloatType, samples });
+    this.composer = new EffectComposer(renderer, rt);
     this.composer.setPixelRatio(1);
     this.renderPass = new RenderPass(scene, camera);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(320, 240), 0.85, 0.45, 0.82);
     this.arcade = new ShaderPass(ArcadeShader);
     this.composer.addPass(this.renderPass);
+    this.composer.addPass(new ShaderPass(SanitizeShader));
     this.composer.addPass(this.bloom);
     this.composer.addPass(this.arcade);
     this.composer.addPass(new OutputPass());

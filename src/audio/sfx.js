@@ -482,6 +482,275 @@ export const sfx = {
   groan(voice) { shout('groan', voice, { vol: 0.8 }); },
   screamCut(voice) { shout('cutoff', voice); },
 
+  // ---------------------------------------------------------- humiliation
+  /** Sad trombone: wah wah wah waaah. */
+  humSting() {
+    if (isMuted()) return;
+    const c = ac();
+    const t0 = c.currentTime;
+    [[196, 0.32], [185, 0.32], [174.6, 0.32], [164.8, 1.1]].forEach(([f, d], i) => {
+      const t = t0 + i * 0.36;
+      const o = c.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f, t);
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.Q.value = 6;
+      lp.frequency.setValueAtTime(300, t);
+      lp.frequency.linearRampToValueAtTime(1400, t + 0.08);
+      lp.frequency.linearRampToValueAtTime(500, t + d);
+      if (i === 3) {
+        const lfo = c.createOscillator();
+        const lg = c.createGain();
+        lfo.frequency.value = 6;
+        lg.gain.value = 5;
+        lfo.connect(lg).connect(o.frequency);
+        lfo.start(t); lfo.stop(t + d + 0.1);
+      }
+      const g = c.createGain();
+      env(g, t, 0.03, 0.35, d);
+      o.connect(lp).connect(g).connect(M());
+      o.start(t); o.stop(t + d + 0.1);
+    });
+  },
+  crowdLaugh() {
+    if (isMuted()) return;
+    for (let i = 0; i < 16; i++) {
+      shout('ha', { pitch: 140 + Math.random() * 200, formant: 0.9 + Math.random() * 0.3 }, { delay: Math.random() * 1.6, vol: 0.35 });
+    }
+    this.crowd(0.4, 2);
+  },
+  rumble(dur = 1.4) {
+    if (isMuted()) return;
+    tone('sine', 42, 30, dur, 0.8);
+    tone('sine', 55, 38, dur, 0.4);
+    burst(dur, 'lowpass', 220, 0.6);
+  },
+  stomp() {
+    if (isMuted()) return;
+    const t = ac().currentTime;
+    tone('sine', 70, 22, 1.1, 1.3);
+    burst(0.6, 'lowpass', 1800, 0.9, { sweepTo: 100, at: t });
+    crack(t, 0.9);
+    reverbHit(t, 1);
+  },
+  whistleFall(dur = 1.6) {
+    if (isMuted()) return;
+    const c = ac();
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    o.frequency.setValueAtTime(2600, t);
+    o.frequency.exponentialRampToValueAtTime(500, t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.02, t);
+    g.gain.linearRampToValueAtTime(0.25, t + dur);
+    o.connect(g).connect(M());
+    o.start(t); o.stop(t + dur + 0.02);
+    burst(dur, 'bandpass', 300, 0.5, { q: 2, sweepTo: 4000, at: t });
+  },
+  glitch(dur = 1.6) {
+    if (isMuted()) return;
+    const t0 = ac().currentTime;
+    for (let x = 0; x < dur; x += 0.03 + Math.random() * 0.05) {
+      tone('square', 100 + Math.random() * 2400, 100 + Math.random() * 2400, 0.03, 0.08, x);
+      if (Math.random() < 0.3) burst(0.04, 'highpass', 3000, 0.25, { at: t0 + x });
+    }
+  },
+  blackHole(dur = 2) {
+    if (isMuted()) return;
+    tone('sawtooth', 320, 35, dur, 0.18);
+    tone('sine', 60, 28, dur, 0.6);
+    burst(dur, 'bandpass', 200, 0.5, { q: 3, sweepTo: 5000 });
+  },
+  pop() {
+    if (isMuted()) return;
+    tone('sine', 300, 1400, 0.08, 0.5);
+    burst(0.1, 'highpass', 2000, 0.5);
+  },
+  note(midi = 72, vol = 0.25) {
+    if (isMuted()) return;
+    const f = 440 * Math.pow(2, (midi - 69) / 12);
+    tone('square', f, f, 0.25, vol * 0.5);
+    tone('triangle', f * 2, f * 2, 0.4, vol * 0.4);
+  },
+  /** Korobeiniki (traditional folk tune) – square-wave chiptune. */
+  korobeiniki() {
+    if (isMuted()) return;
+    const q = 0.23;
+    const mel = [[76, 2], [71, 1], [72, 1], [74, 2], [72, 1], [71, 1], [69, 2], [69, 1], [72, 1], [76, 2], [74, 1], [72, 1], [71, 3], [72, 1], [74, 2], [76, 2], [72, 2], [69, 2], [69, 3]];
+    let t = 0;
+    for (const [m, d] of mel) {
+      const f = 440 * Math.pow(2, (m - 69) / 12);
+      tone('square', f, f, d * q * 0.9, 0.09, t);
+      t += d * q;
+    }
+    for (let i = 0; i < t / (q * 2); i++) {
+      const f = [55, 82.4][i % 2] * (i % 4 < 2 ? 1 : 1.19);
+      tone('triangle', f, f, q * 1.8, 0.18, i * q * 2);
+    }
+  },
+  lock() { if (!isMuted()) { tone('square', 180, 120, 0.06, 0.12); ka(ac().currentTime, 0.4); } },
+  lineClear() {
+    if (isMuted()) return;
+    [60, 64, 67, 72, 76, 79, 84, 88].forEach((m, i) => this.note(m, 0.3 * (1 - i * 0.05)) || null);
+    [60, 64, 67, 72, 76, 79, 84, 88].forEach((m, i) => { const f = 440 * Math.pow(2, (m - 69) / 12); tone('square', f, f, 0.08, 0.1, i * 0.05); });
+    burst(0.6, 'highpass', 4000, 0.3, { sweepTo: 9000 });
+  },
+  splash(vol = 1) {
+    if (isMuted()) return;
+    const t = ac().currentTime;
+    burst(0.6, 'lowpass', 2500, 0.8 * vol, { sweepTo: 250, at: t });
+    burst(0.3, 'highpass', 3000, 0.4 * vol, { at: t });
+    for (let i = 0; i < 6; i++) plip(t + 0.1 + Math.random() * 0.5, 0.12 * vol);
+  },
+  sharkTheme(dur = 2) {
+    if (isMuted()) return;
+    let x = 0;
+    let gap = 0.5;
+    let i = 0;
+    while (x < dur) {
+      const f = i % 2 ? 87.3 : 82.4;
+      tone('sawtooth', f, f, Math.min(0.3, gap * 0.8), 0.28, x);
+      tone('sine', f / 2, f / 2, Math.min(0.3, gap * 0.8), 0.4, x);
+      x += gap;
+      gap = Math.max(0.11, gap * 0.86);
+      i++;
+    }
+  },
+  chomp() {
+    if (isMuted()) return;
+    const t = ac().currentTime;
+    crack(t, 1.2);
+    squelch(t + 0.02, 1);
+    tone('sine', 130, 40, 0.35, 0.9);
+  },
+  burp() {
+    if (isMuted()) return;
+    const c = ac();
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(95, t);
+    o.frequency.linearRampToValueAtTime(70, t + 0.6);
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 600;
+    const am = c.createGain();
+    const lfo = c.createOscillator();
+    const lg = c.createGain();
+    lfo.frequency.value = 23;
+    lg.gain.value = 0.5;
+    am.gain.value = 0.5;
+    lfo.connect(lg).connect(am.gain);
+    const g = c.createGain();
+    env(g, t, 0.03, 0.8, 0.65);
+    o.connect(lp).connect(am).connect(g).connect(M());
+    o.start(t); o.stop(t + 0.7);
+    lfo.start(t); lfo.stop(t + 0.7);
+  },
+  ufoSiren(dur = 5) {
+    if (isMuted()) return;
+    const c = ac();
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    o.frequency.value = 760;
+    const lfo = c.createOscillator();
+    const lg = c.createGain();
+    lfo.frequency.value = 5.5;
+    lg.gain.value = 260;
+    lfo.connect(lg).connect(o.frequency);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.4);
+    g.gain.setValueAtTime(0.12, t + dur - 0.4);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(M());
+    o.start(t); o.stop(t + dur);
+    lfo.start(t); lfo.stop(t + dur);
+    tone('sine', 62, 62, dur, 0.25);
+  },
+  zap() { if (!isMuted()) { tone('sawtooth', 1600, 180, 0.35, 0.2); burst(0.3, 'bandpass', 2000, 0.3, { q: 3 }); } },
+  ufoBang() {
+    if (isMuted()) return;
+    const t = ac().currentTime;
+    tone('sine', 90, 40, 0.25, 0.8);
+    burst(0.08, 'bandpass', 2600, 0.6, { q: 5, at: t });
+    ka(t, 1);
+  },
+  zip() { if (!isMuted()) tone('sine', 300, 2600, 0.35, 0.25); },
+  thwack() {
+    if (isMuted()) return;
+    const t = ac().currentTime;
+    burst(0.09, 'bandpass', 1300, 1.0, { q: 3, at: t });
+    tone('triangle', 320, 140, 0.12, 0.6);
+    const c = ac();
+    const o = c.createOscillator();
+    o.frequency.value = 200;
+    const lfo = c.createOscillator();
+    const lg = c.createGain();
+    lfo.frequency.value = 14;
+    lg.gain.value = 60;
+    lfo.connect(lg).connect(o.frequency);
+    const g = c.createGain();
+    env(g, t + 0.05, 0.01, 0.25, 0.55);
+    o.connect(g).connect(M());
+    o.start(t); o.stop(t + 0.65);
+    lfo.start(t); lfo.stop(t + 0.65);
+  },
+  schoolBell() {
+    if (isMuted()) return;
+    const c = ac();
+    const t0 = c.currentTime;
+    for (let i = 0; i < 26; i++) {
+      const t = t0 + i * 0.045;
+      for (const [m, v] of [[1, 0.12], [2.76, 0.05]]) {
+        const o = c.createOscillator();
+        const g = c.createGain();
+        o.frequency.value = 1150 * m;
+        env(g, t, 0.001, v, 0.12);
+        o.connect(g).connect(M());
+        o.start(t); o.stop(t + 0.15);
+      }
+    }
+  },
+  grind(dur = 2) {
+    if (isMuted()) return;
+    const c = ac();
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.value = 110;
+    const lfo = c.createOscillator();
+    const lg = c.createGain();
+    lfo.frequency.value = 17;
+    lg.gain.value = 40;
+    lfo.connect(lg).connect(o.frequency);
+    const ws = c.createWaveShaper();
+    ws.curve = SHAPER;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.15);
+    g.gain.setValueAtTime(0.12, t + dur - 0.2);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(ws).connect(g).connect(M());
+    o.start(t); o.stop(t + dur);
+    lfo.start(t); lfo.stop(t + dur);
+    burst(dur, 'bandpass', 900, 0.35, { q: 2, at: t });
+  },
+  ding() { if (!isMuted()) rin(ac().currentTime, 0.35); },
+  batCrack() {
+    if (isMuted()) return;
+    const t = ac().currentTime;
+    crack(t, 1.4);
+    tone('square', 1400, 200, 0.06, 0.4);
+    burst(0.12, 'highpass', 2500, 0.8, { at: t });
+    reverbHit(t, 0.8);
+  },
+  twinkle() {
+    if (isMuted()) return;
+    [2093, 2637, 3136, 4186].forEach((f, i) => tone('sine', f, f, 0.35, 0.18, i * 0.07));
+  },
+
   // ---------------------------------------------------------- arcade extras
   /** Big impact for heavy hits / supers. */
   impact(strength = 1) {

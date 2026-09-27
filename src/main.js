@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import './style.css';
 import { SNAP } from './ps1.js';
+import { Q, setQuality } from './quality.js';
+import { HDStage } from './hdfx.js';
 import { createStage, STAGES, STAGE_ORDER } from './stages.js';
 import { Fighter, ROSTER, BOSS, makePortraits } from './fighter.js';
 import { Effects } from './effects.js';
@@ -13,6 +15,7 @@ import { G } from './game/context.js';
 import { T, tick, sleep, sleepReal, abortAll, Abort } from './game/time.js';
 import { Fight } from './game/fight.js';
 import { DEATH_DEBUG } from './game/death.js';
+import { HUM_DEBUG } from './game/humiliation.js';
 import { hud, $ } from './ui/hud.js';
 import { qualifies, addScore, hiScore, renderScores } from './game/scores.js';
 import { isUnlocked, unlockedCount, recordClear, unlockAll, tableResults, masteredTables } from './game/progress.js';
@@ -40,39 +43,83 @@ const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.strin
 const canvas = $('#game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(1);
+document.body.classList.toggle('retro', !Q.hd);
+document.body.classList.toggle('hd', Q.hd);
+if (Q.hd) {
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+}
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 300);
-const post = new PostFX(renderer, scene, camera);
+const post = new PostFX(renderer, scene, camera, { samples: Q.hd ? 4 : 0 });
+const hd = Q.hd ? new HDStage(renderer, scene) : null;
 const cam = new CameraDirector(camera);
 const fx = new Effects(scene);
 fx.onSplat = () => sfx.plip();
 
+// HD performance governor: steps quality down if the frame rate is too low.
+const perf = { level: 0, start: 0, frames: 0, grace: 2 };
+function governPerf() {
+  if (!Q.hd || perf.level >= 3 || T.paused || document.hidden) { perf.start = 0; return; }
+  const now = performance.now();
+  if (!perf.start) { perf.start = now; perf.frames = 0; return; }
+  perf.frames++;
+  const secs = (now - perf.start) / 1000;
+  if (secs < 2) return;
+  const fps = perf.frames / secs;
+  perf.start = now;
+  perf.frames = 0;
+  if (perf.grace > 0) { perf.grace--; return; }
+  if (fps >= 40) return;
+  perf.level++;
+  perf.grace = 1;
+  if (perf.level === 2 && hd) { hd.disableFloor = true; hd.disposeFloor(); }
+  if (perf.level === 3) { renderer.shadowMap.enabled = false; scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); }
+  resize();
+  console.info(`[perf] ${fps.toFixed(0)} fps – HD quality stepped down to level ${perf.level}`);
+}
+
 function resize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const scale = Math.max(1, h / 400);
-  const iw = Math.round(w / scale);
-  const ih = Math.round(h / scale);
+  let iw, ih;
+  if (Q.hd) {
+    // native resolution (capped so 4K screens stay smooth; lowered by the perf governor)
+    let pr = Math.min(window.devicePixelRatio || 1, 2);
+    if (w * h * pr * pr > 3.7e6) pr = Math.sqrt(3.7e6 / (w * h));
+    if (perf.level >= 1) pr = Math.min(pr, 1);
+    if (perf.level >= 3) pr *= 0.7;
+    iw = Math.round(w * pr);
+    ih = Math.round(h * pr);
+  } else {
+    const scale = Math.max(1, h / 400);
+    iw = Math.round(w / scale);
+    ih = Math.round(h / scale);
+  }
   renderer.setSize(iw, ih, false);
   post.setSize(iw, ih);
+  hd?.setSize(iw, ih);
   canvas.style.width = `${w}px`;
   canvas.style.height = `${h}px`;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  SNAP.value.set(iw * 0.35, ih * 0.35);
+  if (Q.hd) SNAP.value.set(1e6, 1e6); // no PS1 vertex wobble in HD
+  else SNAP.value.set(iw * 0.35, ih * 0.35);
 }
 window.addEventListener('resize', resize);
 resize();
 
 const portraits = makePortraits(ALL_FIGHTERS);
-Object.assign(G, { scene, camera, cam, post, fx, settings, portraits });
+Object.assign(G, { scene, camera, cam, post, fx, settings, portraits, hd, renderer });
 
 let stage = null;
 function setStage(id) {
   if (stage?.id === id) return;
+  hd?.disposeFloor();
   stage?.dispose();
   stage = createStage(id, scene);
   G.stage = stage;
+  hd?.onStage(stage);
 }
 
 let p1 = null;
@@ -239,6 +286,15 @@ function buildOptions() {
   chips('#maxfactor', 'maxFactor');
   chips('#rounds', 'rounds');
   chips('#gore', 'gore');
+  for (const b of $('#quality').children) {
+    b.classList.toggle('on', (b.dataset.v === 'hd') === Q.hd);
+    b.onclick = () => {
+      if ((b.dataset.v === 'hd') === Q.hd) return;
+      setQuality(b.dataset.v);
+      saveSettings();
+      location.reload();
+    };
+  }
   const diffs = $('#difficulty');
   diffs.innerHTML = '';
   Object.entries(DIFFICULTIES).forEach(([id, d], i) => {
@@ -719,6 +775,7 @@ function frame(now) {
   const raw = Math.min(0.05, (now - last) / 1000);
   last = now;
   const { dt, rdt } = tick(raw);
+  governPerf();
 
   if (fight) fight.update(dt, rdt);
   else { p1?.update(dt); p2?.update(dt); }
@@ -751,12 +808,13 @@ requestAnimationFrame(frame);
 
 // Debug hook for automated testing
 window.__game = {
-  G, T, settings, DEATH_DEBUG,
+  G, T, settings, DEATH_DEBUG, HUM_DEBUG,
   get fight() { return fight; },
   get mode() { return mode; },
   get p1() { return p1; },
   get p2() { return p2; },
   startArcade: () => startArcade().catch(swallow),
+  setStage,
   pressStart,
   confirmSelect,
 };

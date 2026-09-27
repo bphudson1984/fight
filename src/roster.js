@@ -18,7 +18,7 @@ export const ROSTER = [
     aura: 0xff4a1a, special: 'TIMES TABLE TYPHOON', stats: [4, 4, 4], color: '#ff4a1a',
   },
   {
-    id: 'luna', name: 'LUNA', style: 'Kickboxing', unlock: { type: 'free', table: 2 },
+    id: 'luna', metalColors: [0xffd23f], name: 'LUNA', style: 'Kickboxing', unlock: { type: 'free', table: 2 },
     voice: { pitch: 330, formant: 1.18 },
     skin: 0xf2c6a0, hair: 0x7a2fb0, top: 0x23b7ac, sleeve: 0xf2c6a0, bottom: 0x232a52,
     shin: 0xf2c6a0, belt: 0xffd23f, glove: 0xf4f4f4, shoe: 0xf4f4f4, hairStyle: 'ponytail',
@@ -26,7 +26,7 @@ export const ROSTER = [
     aura: 0x20e0ff, special: 'LUNAR LONG DIVISION', stats: [3, 5, 4], color: '#20e0ff',
   },
   {
-    id: 'brick', name: 'BRICK', style: 'Wrestling', unlock: { type: 'free', table: 5 },
+    id: 'brick', metalColors: [0xf2c230], name: 'BRICK', style: 'Wrestling', unlock: { type: 'free', table: 5 },
     voice: { pitch: 118, formant: 0.88 },
     skin: 0x8a5634, hair: 0x2a1a10, top: 0x8a5634, sleeve: 0x8a5634, bottom: 0x2f8a3a,
     shin: 0x1e1e1e, belt: 0xf2c230, glove: 0x2a2a2a, shoe: 0x1e1e1e, hairStyle: 'bald',
@@ -44,7 +44,7 @@ export const ROSTER = [
 
   // ---------------------------------------------------------------- table masters
   {
-    id: 'triple', name: 'EL TRIPLE', style: 'Lucha Libre', unlock: { type: 'table', tables: [3] },
+    id: 'triple', metalColors: [0xffd23f], name: 'EL TRIPLE', style: 'Lucha Libre', unlock: { type: 'table', tables: [3] },
     voice: { pitch: 150, formant: 0.95 },
     skin: 0xc98a5a, hair: 0xff2a6a, mask: 0xff2a6a, trim: 0xffd23f,
     top: 0xc98a5a, sleeve: 0xc98a5a, bottom: 0x1a3aff, shin: 0xe0102a, belt: 0xffd23f,
@@ -53,7 +53,7 @@ export const ROSTER = [
     aura: 0xff2a6a, special: 'TRIPLE LUCHA LARIAT', stats: [4, 3, 4], color: '#ff2a6a',
   },
   {
-    id: 'volt', name: 'VOLT', style: 'Electro Punk', unlock: { type: 'table', tables: [4] },
+    id: 'volt', metalColors: [0xb0b0b0, 0xd0d0d8], name: 'VOLT', style: 'Electro Punk', unlock: { type: 'table', tables: [4] },
     voice: { pitch: 210, formant: 1.0 },
     skin: 0xf0c8a8, hair: 0x9aff00, top: 0x151518, sleeve: 0xf0c8a8, bottom: 0x2a3a6a,
     shin: 0x2a3a6a, belt: 0xb0b0b0, glove: 0x9aff00, shoe: 0x222222, hairStyle: 'mohawk', face: 'volt',
@@ -69,7 +69,7 @@ export const ROSTER = [
     aura: 0xd040ff, special: 'HEXAGON HEX', stats: [4, 4, 5], color: '#d040ff',
   },
   {
-    id: 'ace', name: 'ACE', style: 'Boxing', unlock: { type: 'table', tables: [7] },
+    id: 'ace', metalColors: [0xffd23f, 0xfff0a0], name: 'ACE', style: 'Boxing', unlock: { type: 'table', tables: [7] },
     voice: { pitch: 130, formant: 0.92 },
     skin: 0x5a3a28, hair: 0x111111, top: 0x5a3a28, sleeve: 0x5a3a28, bottom: 0xffc020,
     shin: 0x5a3a28, belt: 0xffd23f, glove: 0xd01010, shoe: 0xf0f0f0, hairStyle: 'flattop', face: 'shades',
@@ -77,7 +77,7 @@ export const ROSTER = [
     aura: 0xffd23f, special: 'LUCKY SEVEN KNOCKOUT', stats: [5, 4, 2], color: '#ffd23f',
   },
   {
-    id: 'kraken', name: 'KRAKEN', style: 'Pirate Brawl', unlock: { type: 'table', tables: [8] },
+    id: 'kraken', metalColors: [0xc09030], name: 'KRAKEN', style: 'Pirate Brawl', unlock: { type: 'table', tables: [8] },
     voice: { pitch: 110, formant: 0.88 },
     skin: 0xb07a50, hair: 0x2a1a0a, band: 0x1a60a0, top: 0x7a1a1a, sleeve: 0x7a1a1a, bottom: 0x2a2a2a,
     shin: 0x3a2010, belt: 0xc09030, glove: 0x3a2010, shoe: 0x3a2010, hairStyle: 'dreads', face: 'eyepatch',
@@ -93,7 +93,7 @@ export const ROSTER = [
     aura: 0xff8a20, special: 'NINE-TAIL NOVA', stats: [3, 5, 4], color: '#ff8a20',
   },
   {
-    id: 'titan', name: 'TITAN', style: 'Gladiator', unlock: { type: 'table', tables: [11, 12] },
+    id: 'titan', metalColors: [0xb07a30], name: 'TITAN', style: 'Gladiator', unlock: { type: 'table', tables: [11, 12] },
     voice: { pitch: 95, formant: 0.85 },
     skin: 0xc08a60, hair: 0xb07a30, helmet: 0xb07a30, crest: 0xd01818, top: 0xc08a60, sleeve: 0xc08a60,
     bottom: 0x6a4020, shin: 0xb07a30, belt: 0x5a3a1a, glove: 0xb07a30, shoe: 0x5a3a1a,
@@ -127,7 +127,7 @@ export const ROSTER = [
     aura: 0x60e0ff, special: 'ABSOLUTE ZERO', stats: [4, 4, 5], color: '#60e0ff',
   },
   {
-    id: 'ronin', name: 'RONIN', style: 'Samurai', unlock: { type: 'diff', diff: 'legend' },
+    id: 'ronin', metalColors: [0xe8c030], name: 'RONIN', style: 'Samurai', unlock: { type: 'diff', diff: 'legend' },
     voice: { pitch: 140, formant: 0.92 },
     skin: 0xd8a878, hair: 0x151515, top: 0x7a1010, sleeve: 0x2a2a2a, bottom: 0x1a1a2a,
     shin: 0x7a1010, belt: 0xe8c030, glove: 0x2a2a2a, shoe: 0x111111, hairStyle: 'kabuto', face: 'ronin',
@@ -137,7 +137,7 @@ export const ROSTER = [
 
   // ---------------------------------------------------------------- the top secret
   {
-    id: 'nyx', name: 'NYX', style: 'Midnight Emo', unlock: { type: 'top' },
+    id: 'nyx', metalColors: [0x8a8a90, 0xd0d0d8], name: 'NYX', style: 'Midnight Emo', unlock: { type: 'top' },
     voice: { pitch: 380, formant: 1.22 },
     skin: 0xfbe0d8, hair: 0x151018, streak: 0xff4aa8, top: 0x1a1620, sleeve: 0x1a1620, bottom: 0x151018,
     shin: 0x151018, belt: 0x8a8a90, glove: 0x1a1620, shoe: 0x0a0a0a, hairStyle: 'emo', face: 'emo',

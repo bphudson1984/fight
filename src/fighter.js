@@ -2,6 +2,8 @@
 // Local space: fighter faces +z, up is +y, its left side is +x.
 import * as THREE from 'three';
 import { lambert, canvasTexture } from './ps1.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Q, boxGeo, coneGeo, cylGeo, icoGeo, torsoGeo, fighterMat, wetMat } from './quality.js';
 
 import { ROSTER, BOSS } from './roster.js';
 
@@ -299,9 +301,38 @@ Object.assign(ANIMS, {
     K(0.12, { pos: [0, 0, -1.4], spin: 12.566, ...LYING }),
   ],
   gibBody: [K(0.05, { pos: [0, 0.1, -0.2] })],
+  dizzy: (() => {
+    const base = { hipY: 0.88, footL: [0.16, 0.06, 0.08], footR: [-0.16, 0.06, -0.08], elL: [-0.3, 0, 0], elR: [-0.3, 0, 0] };
+    const out = [K(0.25, { ...base, spine: [0.15, 0, 0.2], neck: [0.35, 0.4, 0.4], shL: [-0.2, 0, 0.35], shR: [-0.2, 0, -0.35] })];
+    for (let i = 0; i < 16; i++) {
+      const sgn = i % 2 ? 1 : -1;
+      out.push(K(0.45, { ...base, spine: [0.12, 0.1 * sgn, 0.22 * sgn], neck: [0.3, 0.45 * sgn, 0.45 * sgn], shL: [-0.25, 0, 0.3 + 0.2 * sgn], shR: [-0.25, 0, -0.3 + 0.2 * sgn], hipY: 0.86 + 0.03 * sgn }));
+    }
+    return out;
+  })(),
+  panic: (() => {
+    const out = [];
+    for (let i = 0; i < 24; i++) {
+      const s = i % 2 ? 1 : -1;
+      out.push(K(0.16, {
+        hipY: 0.93, spine: [-0.15, 0.15 * s, 0], neck: [-0.5, 0.3 * s, 0],
+        shL: [-2.8, 0, 0.5 + 0.35 * s], elL: [-0.9, 0, 0], shR: [-2.8, 0, -0.5 + 0.35 * s], elR: [-0.9, 0, 0],
+        ikL: 0, ikR: 0, hipL: [-0.6 * s, 0, 0.1], knL: [0.9, 0, 0], hipR: [0.6 * s, 0, -0.1], knR: [0.9, 0, 0],
+      }));
+    }
+    return out;
+  })(),
+  lookup: (() => {
+    const up = { neck: [-0.95, 0, 0], spine: [-0.25, 0, 0], shL: [-1.1, 0, 0.9], elL: [-1.6, 0, 0], shR: [-1.1, 0, -0.9], elR: [-1.6, 0, 0], hipY: 0.9, footL: [0.16, 0.06, 0.1], footR: [-0.16, 0.06, -0.1] };
+    const out = [K(0.3, up)];
+    for (let i = 0; i < 20; i++) out.push(K(0.08, { ...up, shL: [-1.1, 0, 0.9 + (i % 2 ? 0.08 : -0.08)], shR: [-1.1, 0, -0.9 + (i % 2 ? 0.08 : -0.08)] }));
+    return out;
+  })(),
 });
 
-const HOLD = new Set(['ko', 'victory', 'victory2', 'victory3', 'lose', 'decapBody', 'armripBody', 'spinesnap', 'crumple', 'launchsplat', 'spinout', 'gibBody']);
+const HOLD = new Set(['ko', 'victory', 'victory2', 'victory3', 'lose', 'decapBody', 'armripBody', 'spinesnap', 'crumple', 'launchsplat', 'spinout', 'gibBody', 'dizzy', 'panic', 'lookup']);
+
+const XFORM = () => ({ dx: 0, dy: 0, dz: 0, rx: 0, ry: 0, rz: 0, sx: 1, sy: 1, sz: 1, vis: true, tint: 0x000000, tintAmt: 0, bare: false, rearranged: false });
 export const VICTORIES = ['victory', 'victory2', 'victory3'];
 
 const EASE = {
@@ -342,6 +373,9 @@ export class Fighter {
     this.detached = new Map();
     this.stumps = {};
     this.twitchUntil = 0;
+    this.xform = XFORM();
+    this.baseScaleX = mirror ? -1 : 1;
+    this._tint = { amt: 0, c: 0, bare: false };
     this.stains = [];
     this.gearBlood = 0;
     const root = (this.root = new THREE.Group());
@@ -375,11 +409,7 @@ export class Fighter {
 
     // Torso: tapered 4-sided cylinder
     const spine = (this.spine = grp(pelvis, 0, 0.1, 0));
-    const tg = new THREE.CylinderGeometry(0.34 * S, 0.24 * S, 0.5, 4, 1);
-    tg.rotateY(Math.PI / 4);
-    tg.scale(1, 1, 0.62);
-    tg.translate(0, 0.25, 0);
-    this.mesh(spine, tg, def.top);
+    this.mesh(spine, torsoGeo(S), def.top);
     if (def.gi) {
       this.box(spine, 0.05, 0.36, 0.02, 0xd8d2c4, 0.05, 0.3, 0.16).rotation.z = -0.35;
       this.box(spine, 0.05, 0.36, 0.02, 0xd8d2c4, -0.05, 0.3, 0.16).rotation.z = 0.35;
@@ -389,7 +419,7 @@ export class Fighter {
     }
     if (def.boss) {
       for (const x of [-0.3, 0.3]) this.box(spine, 0.2 * S, 0.1, 0.24 * S, def.band, x * S, 0.5, 0).rotation.z = x > 0 ? -0.3 : 0.3;
-      const core = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.02), this.glow(0xff2030));
+      const core = new THREE.Mesh(boxGeo(0.1, 0.1, 0.02), this.glow(0xff2030));
       core.position.set(0, 0.32, 0.17 * S);
       core.rotation.z = Math.PI / 4;
       spine.add(core);
@@ -429,6 +459,10 @@ export class Fighter {
     this.shadow.position.y = 0.012;
     this.shadow.scale.set(1, 0.7, 1);
 
+    if (Q.hd) {
+      this.root.traverse((o) => { if (o.isMesh && !o.material.isMeshBasicMaterial) o.castShadow = true; });
+      this.shadow.visible = false;
+    }
     this.apply(this.cur);
   }
 
@@ -442,13 +476,13 @@ export class Fighter {
     const side = this.mat(COVER[hs] ?? def.skin);
     const top = this.mat(bare ? def.skin : COVER[hs] ?? def.hair);
     const back = this.mat(bare || hs === 'flattop' ? def.skin : COVER[hs] ?? def.hair);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.25, 0.23), [side, side, top, this.mat(def.skin), this.mat(0xffffff, face), back]);
+    const head = new THREE.Mesh(boxGeo(0.21, 0.25, 0.23), [side, side, top, this.mat(def.skin), this.mat(0xffffff, face), back]);
     head.position.y = 0.19;
     neck.add(head);
     this.head = head;
     const box = (w, h, d, c, x, y, z) => this.box(head, w, h, d, c, x, y, z);
     const cone = (r, h, seg, mat, x, y, z) => {
-      const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, seg), typeof mat === 'number' ? this.mat(mat) : mat);
+      const m = new THREE.Mesh(coneGeo(r, h, seg), typeof mat === 'number' ? this.mat(mat) : mat);
       m.position.set(x, y, z);
       head.add(m);
       return m;
@@ -480,7 +514,7 @@ export class Fighter {
         box(0.25, 0.06, 0.08, def.band, 0, 0.02, 0.1);
         const eye = this.glow(0xff2030);
         for (const x of [-0.05, 0.05]) {
-          const e = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.025, 0.01), eye);
+          const e = new THREE.Mesh(boxGeo(0.06, 0.025, 0.01), eye);
           e.position.set(x, 0.01, 0.118);
           head.add(e);
         }
@@ -495,7 +529,7 @@ export class Fighter {
         const g = this.glow(def.hair);
         for (let i = 0; i < 6; i++) {
           const hgt = [0.1, 0.15, 0.2, 0.2, 0.15, 0.1][i];
-          const m = new THREE.Mesh(new THREE.BoxGeometry(0.035, hgt, 0.04), g);
+          const m = new THREE.Mesh(boxGeo(0.035, hgt, 0.04), g);
           m.position.set(0, 0.125 + hgt / 2, 0.1 - i * 0.042);
           m.rotation.x = -0.2 - i * 0.05;
           head.add(m);
@@ -599,7 +633,7 @@ export class Fighter {
       [[-0.05, 0.05], [0, 0.09], [0.05, 0.05]].forEach(([x, hgt]) => cone(0.018, hgt, 4, g, x, 0.13 + hgt / 2, 0.1));
     }
     if (ex.has('starClip')) {
-      const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.035, 0), this.glow(0xffe040));
+      const m = new THREE.Mesh(icoGeo(0.035, 0), this.glow(0xffe040));
       m.position.set(-0.1, 0.1, 0.08);
       head.add(m);
     }
@@ -611,7 +645,7 @@ export class Fighter {
     const pv = this.pelvis;
     const zf = 0.135 * S;
     const openCyl = (rt, rb, h, mat, parent, y) => {
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 10, 1, true), mat);
+      const m = new THREE.Mesh(cylGeo(rt, rb, h, 10, true), mat);
       m.position.y = y;
       parent.add(m);
       return m;
@@ -644,7 +678,7 @@ export class Fighter {
     if (ex.has('glowhands')) {
       const g = this.glow(def.glowColor ?? def.aura, { transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
       for (const el of [this.elL, this.elR]) {
-        const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.12, 0), g);
+        const m = new THREE.Mesh(icoGeo(0.12, 0), g);
         m.position.y = -0.3;
         el.add(m);
         this.spinners.push(m);
@@ -653,7 +687,7 @@ export class Fighter {
     if (ex.has('studs')) {
       for (const sh of [this.shL, this.shR]) {
         for (let i = 0; i < 3; i++) {
-          const c = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.07, 4), this.mat(0xd0d0d8));
+          const c = new THREE.Mesh(coneGeo(0.022, 0.07, 4), this.mat(0xd0d0d8));
           c.position.set(-0.04 + i * 0.04, 0.07, 0);
           sh.add(c);
         }
@@ -693,7 +727,7 @@ export class Fighter {
       const g = this.glow(0x9ef8ff);
       for (const [sh, sx] of [[this.shL, 1], [this.shR, -1]]) {
         for (let i = 0; i < 3; i++) {
-          const c = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.14 + i * 0.03, 4), g);
+          const c = new THREE.Mesh(coneGeo(0.03, 0.14 + i * 0.03, 4), g);
           c.position.set(sx * (0.02 + i * 0.03), 0.1, -0.04 + i * 0.04);
           c.rotation.z = -sx * (0.3 + i * 0.2);
           sh.add(c);
@@ -703,14 +737,14 @@ export class Fighter {
     if (ex.has('foxtails')) {
       const white = this.mat(0xf4f0ea);
       for (let i = 0; i < 5; i++) {
-        const geo = new THREE.ConeGeometry(0.07, 0.55, 5);
+        const geo = coneGeo(0.07, 0.55, 5);
         geo.translate(0, 0.275, 0);
         const t = new THREE.Mesh(geo, this.mat(def.hair));
         t.position.set(0, 0, -0.1 * S);
         const bz = (i - 2) * 0.38;
         t.rotation.set(-1.0 - (i % 2) * 0.3, 0, bz);
         t.userData = { bz, ph: i, axis: 'z' };
-        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.14, 5), white);
+        const tip = new THREE.Mesh(coneGeo(0.035, 0.14, 5), white);
         tip.position.y = 0.5;
         t.add(tip);
         pv.add(t);
@@ -718,7 +752,7 @@ export class Fighter {
       }
     }
     if (ex.has('dinotail')) {
-      const geo = new THREE.ConeGeometry(0.13, 0.7, 6);
+      const geo = coneGeo(0.13, 0.7, 6);
       geo.translate(0, 0.35, 0);
       const t = new THREE.Mesh(geo, this.mat(def.hair));
       t.position.set(0, -0.02, -0.1 * S);
@@ -727,7 +761,7 @@ export class Fighter {
       pv.add(t);
       this.tails.push(t);
       for (let i = 0; i < 5; i++) {
-        const c = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.1, 4), this.mat(0x2a8a30));
+        const c = new THREE.Mesh(coneGeo(0.04, 0.1, 4), this.mat(0x2a8a30));
         c.position.set(0, 0.08 + i * 0.09, -0.14 * S);
         c.rotation.x = -1.3;
         sp.add(c);
@@ -737,7 +771,7 @@ export class Fighter {
     if (ex.has('heart')) {
       const g = this.glow(0xff2e8a);
       const add = (w, x, y) => {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(w, w, 0.012), g);
+        const m = new THREE.Mesh(boxGeo(w, w, 0.012), g);
         m.position.set(x, y, zf + 0.008);
         m.rotation.z = Math.PI / 4;
         sp.add(m);
@@ -748,7 +782,7 @@ export class Fighter {
     }
     if (ex.has('choker')) {
       this.box(this.neck, 0.115, 0.03, 0.115, 0x0a0a0a, 0, 0.02, 0);
-      const d = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.01), this.glow(0xff4aa8));
+      const d = new THREE.Mesh(boxGeo(0.02, 0.02, 0.01), this.glow(0xff4aa8));
       d.position.set(0, 0.02, 0.06);
       this.neck.add(d);
     }
@@ -774,7 +808,7 @@ export class Fighter {
   }
 
   pbox(parent, w, h, d, key, color, x, y, z) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this.patMat(key, color));
+    const m = new THREE.Mesh(boxGeo(w, h, d), this.patMat(key, color));
     m.position.set(x, y, z);
     parent.add(m);
     return m;
@@ -791,7 +825,10 @@ export class Fighter {
   }
 
   mat(color, map = null) {
-    const m = lambert(color, map ? { map } : {});
+    const d = this.def;
+    const metal = !!d.boss || (d.metalColors || []).includes(color);
+    const skin = color === d.skin && !d.boss;
+    const m = fighterMat(color, { map, metal, skin });
     this.mats.push(m);
     return m;
   }
@@ -803,7 +840,7 @@ export class Fighter {
   }
 
   box(parent, w, h, d, color, x, y, z) {
-    const m = this.mesh(parent, new THREE.BoxGeometry(w, h, d), color);
+    const m = this.mesh(parent, boxGeo(w, h, d), color);
     m.position.set(x, y, z);
     return m;
   }
@@ -832,11 +869,12 @@ export class Fighter {
 
   restoreParts() {
     for (const [name, d] of this.detached) {
+      if (!d.obj) continue;
       d.parent.add(d.obj);
       d.obj.position.copy(d.pos);
       d.obj.quaternion.copy(d.quat);
       d.obj.scale.copy(d.scale);
-      this.showStump(name, false);
+      if (!d.noStump) this.showStump(name, false);
     }
     this.detached.clear();
   }
@@ -857,8 +895,8 @@ export class Fighter {
       const [parent, x, y, z, w] = where;
       const g = new THREE.Group();
       g.position.set(x, y, z);
-      const meat = new THREE.Mesh(new THREE.BoxGeometry(w, 0.035, w * 0.9), STUMP_MAT);
-      const bone = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, 0.03), BONE_MAT);
+      const meat = new THREE.Mesh(boxGeo(w, 0.035, w * 0.9), STUMP_MAT);
+      const bone = new THREE.Mesh(boxGeo(0.03, 0.06, 0.03), BONE_MAT);
       bone.position.y = 0.02;
       g.add(meat, bone);
       parent.add(g);
@@ -867,10 +905,64 @@ export class Fighter {
     this.stumps[name].visible = on;
   }
 
+  // ---------------------------------------------------------- humiliation support
+  snapXform() { return { ...this.xform }; }
+  setXform(x) {
+    Object.assign(this.xform, x);
+    if (x.rearranged && !this.detached.has('~rearranged')) this.rearrange();
+  }
+
+  resetLook() {
+    this.xform = XFORM();
+    this.applyTint(true);
+    for (const m of this.mats) { delete m.userData.hBase; delete m.userData.hMap; }
+  }
+
+  applyTint(force = false) {
+    const X = this.xform;
+    const T0 = this._tint;
+    if (!force && T0.amt === X.tintAmt && T0.c === X.tint && T0.bare === X.bare) return;
+    T0.amt = X.tintAmt; T0.c = X.tint; T0.bare = X.bare;
+    const c = new THREE.Color(X.tint);
+    for (const m of this.mats) {
+      if (!m.userData.hBase) {
+        if (X.tintAmt === 0 && !X.bare) continue;
+        m.userData.hBase = m.color.clone();
+        m.userData.hMap = m.map ?? 0;
+      }
+      m.color.copy(m.userData.hBase).lerp(c, X.tintAmt);
+      const want = X.bare ? null : (m.userData.hMap || null);
+      if (m.map !== want) { m.map = want; m.needsUpdate = true; }
+    }
+  }
+
+  /** Swap arms and legs (for a botched alien reassembly). */
+  rearrange() {
+    if (this.detached.has('~rearranged')) return;
+    const S = this.S;
+    const moves = [
+      [this.shL, this.pelvis, new THREE.Vector3(0.1 * S, -0.06, 0), 0],
+      [this.shR, this.pelvis, new THREE.Vector3(-0.1 * S, -0.06, 0), 0],
+      [this.hipL, this.spine, new THREE.Vector3(0.26 * S, 0.44, 0), Math.PI],
+      [this.hipR, this.spine, new THREE.Vector3(-0.26 * S, 0.44, 0), Math.PI],
+    ];
+    const saved = moves.map(([obj]) => ({ obj, parent: obj.parent, pos: obj.position.clone(), quat: obj.quaternion.clone(), scale: obj.scale.clone() }));
+    for (const [obj, parent, pos, rx] of moves) {
+      parent.add(obj);
+      obj.position.copy(pos);
+      obj.rotation.set(rx, 0, 0);
+    }
+    const names = ['shL', 'shR', 'hipL', 'hipR'];
+    saved.forEach((d, i) => this.detached.set(names[i], { ...d, noStump: true }));
+    this.detached.set('~rearranged', { obj: null, noStump: true });
+    this.xform.rearranged = true;
+  }
+
   /** Dead bodies spasm for a while. */
   twitch(seconds) { this.twitchUntil = this.time + seconds; }
 
   reset() {
+    this.resetLook();
     this.restoreParts();
     this.twitchUntil = 0;
     this.health = 100;
@@ -1018,6 +1110,16 @@ export class Fighter {
     const root = this.root;
     root.position.set(this.homeX + this.facing * p[OFF.pos + 2], p[OFF.pos + 1], -p[OFF.pos]);
     root.rotation.y = this.baseRotY + p[OFF.spin];
+    const X = this.xform;
+    root.position.x += X.dx;
+    root.position.y += X.dy;
+    root.position.z += X.dz;
+    root.rotation.x = X.rx;
+    root.rotation.y += X.ry;
+    root.rotation.z = X.rz;
+    root.scale.set(this.baseScaleX * X.sx, X.sy, X.sz);
+    root.visible = X.vis;
+    this.applyTint();
     const D = this.detached;
     const offP = D.has('pelvis');
     const offS = offP || D.has('spine');
@@ -1051,6 +1153,7 @@ export class Fighter {
     if (legL) this.legIK(this.hipL, this.knL, p, OFF.footL, p[OFF.ikL]);
     if (legR) this.legIK(this.hipR, this.knR, p, OFF.footR, p[OFF.ikR]);
 
+    if (!Q.hd) this.shadow.visible = X.vis;
     this.shadow.position.x = root.position.x;
     this.shadow.position.z = root.position.z;
     const s = Math.max(0.4, 1 - root.position.y * 0.5);
@@ -1089,10 +1192,10 @@ export class Fighter {
 const IDLE = pose();
 
 const STAIN_GEO = new THREE.PlaneGeometry(1, 1);
-const STAIN_MATS = [0x7a0006, 0x9a000a, 0xb0100e].map((c) => lambert(c, { side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 }));
+const STAIN_MATS = [0x7a0006, 0x9a000a, 0xb0100e].map((c) => wetMat(c, { side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 }));
 const GEAR_BLOOD = new THREE.Color(0x6a0004);
-const STUMP_MAT = lambert(0x7a0008);
-const BONE_MAT = lambert(0xf0e8d8);
+const STUMP_MAT = wetMat(0x7a0008);
+const BONE_MAT = wetMat(0xf0e8d8);
 
 const hexc = (c) => '#' + c.toString(16).padStart(6, '0');
 
@@ -1273,9 +1376,13 @@ function drawDamage(g, level) {
 /** Render a still of each fighter to a data URL (for menus / HUD). */
 export function makePortraits(defs) {
   const canvas = document.createElement('canvas');
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, preserveDrawingBuffer: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: Q.hd, preserveDrawingBuffer: true });
   renderer.setPixelRatio(1);
   const scene = new THREE.Scene();
+  if (Q.hd) {
+    const pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+  }
   scene.add(new THREE.HemisphereLight(0xffe2c0, 0x40304a, 1.6));
   const sun = new THREE.DirectionalLight(0xffffff, 2.0);
   sun.position.set(2, 3, 4);

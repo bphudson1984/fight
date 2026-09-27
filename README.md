@@ -42,6 +42,27 @@ never the same one twice in a row. The replay then shows it again.
 
 Dead bodies twitch afterwards. Code: `src/game/death.js` (choreography, body-part physics, blood emitters, replay data).
 
+## HUMILIATION finishers
+
+Win a fight **2-0** and the final K.O. becomes a HUMILIATION (player only – the CPU never does it to you).
+The loser staggers dizzy, a sad trombone plays, the crowd laughs, then one of 10 set-pieces (shuffled so each
+comes up once before any repeats), a named banner + announcer call, a HUMILIATION REPLAY and a 100,000 bonus.
+
+| Finisher | What happens (Extreme gore adds the gross version) |
+|---|---|
+| SQUASHED! | a giant foot stomps down from the sky – pancaked, then peels off and flutters away (Extreme: crater of red) |
+| EXTINCT! | a comet streaks in, mushroom cloud – charred and crumbles to ash (Extreme: body parts rain down) |
+| DIVIDE BY ZERO! | "÷ 0" appears, the victim glitches out behind a MATH ERROR screen, then spaghettifies into a black hole |
+| NUMBER CRUNCHED! | the last question falls from the sky as giant 3D digits, each one squashing them further |
+| LINE CLEAR! | Tetris blocks drop to a chiptune and complete a row through them – cleared (Extreme: meat cubes) |
+| CHOMPED! | floor turns to water, a fin circles, a shark bursts up and swallows them, then burps |
+| ABDUCTED! | UFO tractor beam; they come back with arms and legs swapped (Extreme: just the skeleton) |
+| DETENTION! | a giant teacher's ruler whacks them into the floor like a nail, school bell, red "F-" |
+| SHARPENED! | fed head-first into a giant pencil sharpener; shavings in their outfit colours (Extreme: + shoes) |
+| HUD BONK! | your health bar leaves the HUD and home-runs them out of the stadium |
+
+Code: `src/game/humiliation.js` (set-pieces, props, replay snapshots).
+
 ## Unlockable fighters (17 total)
 
 | Fighter | How to unlock |
@@ -70,17 +91,27 @@ Settings (saved in the browser): tables 1–12, up to ×10/×12, question types 
 difficulty (Rookie / Fighter / Champion / Legend – CPU answer speed, damage, round time), rounds per fight, gore
 (Off / Arcade / Extreme).
 
+## Graphics modes (Fight Settings → Graphics)
+
+- **HD Glossy** (default): rounded/bevelled high-poly fighters (~6,000 triangles each vs ~300 in Retro), glossy
+  clear-coat plastic + polished metal materials, stage-captured environment reflections, a mirror-glossy arena
+  floor, real-time shadows, full native resolution with multisample anti-aliasing. If the frame rate drops
+  below ~40 fps it automatically lowers resolution, then the mirror floor, then shadows.
+- **Retro PS1**: the original low-res, flat-shaded, vertex-wobble look. Fastest – use on older school devices.
+
 Controls: digits, Backspace, Enter, Space (super), Esc (pause), arrow keys on select. Touch keypad on tablets.
 
 ## Code map
 
 - `src/main.js` – screens & flow (attract/demo, options, select, VS, ladder, continue, name entry, results), input, loop
 - `src/game/death.js` – K.O. finishers (dismemberment, part physics, blood geysers, replay support)
+- `src/game/humiliation.js` – the 10 HUMILIATION set-pieces for 2-0 wins
 - `src/game/fight.js` – the fight engine (questions, combos, supers, parry, KO, replay, timer, scoring, demo AI)
 - `src/game/time.js`, `context.js`, `scores.js` – clock/slow-mo/hit-stop, shared services, high scores
 - `src/fighter.js` – low-poly fighters + boss, keyframed moves, leg IK, afterimages, portraits
 - `src/stages.js` – four animated stages (Sunset Temple, Neon City, Magma Core, Omega Grid)
 - `src/effects.js` – sparks, streaks, shockwaves, explosions, blood, teeth, auras, ghosts
+- `src/quality.js`, `src/hdfx.js` – HD vs Retro geometry/material factories; env maps, shadows, mirror floor
 - `src/postfx.js` – bloom, chromatic aberration, zoom blur, impact-frame inversion, flashes, danger pulse
 - `src/camera.js` – camera director (fight, intro, super, rush, impact, KO, victory, replay)
 - `src/ui/hud.js` – HUD, banners, popups, cut-ins, tally

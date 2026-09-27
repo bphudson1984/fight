@@ -352,6 +352,7 @@ export class DeathDirector {
     let out = null;
     for (const [i, f] of [[0, p1], [1, p2]]) {
       for (const [name, d] of f.detached) {
+        if (!d.obj || d.noStump) continue;
         (out ??= []).push([i, name, d.obj.position.clone(), d.obj.quaternion.clone()]);
       }
     }
@@ -364,5 +365,6 @@ export class DeathDirector {
     else if (e.type === 'pool') G.fx.pool(e.x, e.z);
     else if (e.type === 'sound') sfx[e.name]?.(...(e.args || []));
     else if (e.type === 'emitter') this.emitters.push({ ...e.spec, age: 0 });
+    else if (e.type === 'hum') this.fight.hum?.replayEvent(e);
   }
 }

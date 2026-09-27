@@ -11,6 +11,7 @@ import { music } from '../audio/music.js';
 import { VICTORIES } from '../fighter.js';
 import { DIFFICULTIES } from '../maths.js';
 import { DeathDirector, pickDeath } from './death.js';
+import { HumiliationDirector, pickHumiliation, HUM_DEBUG } from './humiliation.js';
 
 const BASE_DMG = { jab: 7, cross: 8, kick: 10, elbow: 9, knee: 11, sweep: 10, uppercut: 12, spinKick: 14, rushL: 3, rushR: 3, rushKick: 3.5 };
 const CHAIN = ['jab', 'cross', 'kick', 'elbow', 'cross', 'knee', 'jab', 'sweep'];
@@ -45,6 +46,7 @@ export class Fight {
     this.frame = 0;
     this.rejects = new Set();
     this.death = new DeathDirector(this);
+    this.hum = new HumiliationDirector(this);
     this.lastBeat = 0;
     this.lastTick = 99;
   }
@@ -67,6 +69,7 @@ export class Fight {
     hud.superButton(false);
     G.post.setDim(0);
     G.post.setDanger(0);
+    this.hum.clear();
   }
 
   get need() { return this.attract ? 1 : G.settings.rounds; }
@@ -80,6 +83,7 @@ export class Fight {
       this.round++;
     }
     this.phase = 'done';
+    this.hum.clear();
     G.post.setDanger(0);
     music.setTempoScale(1);
     return this.wins[0] >= this.need;
@@ -103,7 +107,9 @@ export class Fight {
     this.events = [];
     this.superRequested = false;
     this.cpuSuperRequested = false;
+    this.hum.clear();
     this.death.reset();
+    this.humiliated = null;
     hud.setTimer(this.time);
     hud.combo(0);
     hud.hideQuestion();
@@ -188,6 +194,7 @@ export class Fight {
         { label: `MAX COMBO x${this.maxCombo}`, value: this.maxCombo * 500 },
       ];
       if (perfect) rows.push({ label: 'PERFECT BONUS', value: 50000 });
+      if (this.humiliated) rows.push({ label: 'HUMILIATION BONUS', value: 100000 });
       const bonus = await hud.tally(rows, () => sfx.scoreTick());
       G.run.score += bonus;
     } else {
@@ -234,6 +241,7 @@ export class Fight {
     const correct = given === q.q.answer;
     const elapsed = q.mode === 'normal' ? T.now - q.start : T.real - q.startReal;
     G.run.gen.report(q.q, correct);
+    this.lastQ = q.q;
     G.run.log.push({ q: q.q, kind: correct ? 'correct' : 'wrong', time: elapsed, given, mode: q.mode });
     hud.result(q.q, this.typed, correct);
     if (q.mode === 'rush') this.onRushAnswer(correct);
@@ -448,9 +456,17 @@ export class Fight {
     cam.shake(0.5);
     hud.banner('K.O.', 'huge fire', 1500);
     say('K.O.!', { rate: 0.8 });
-    const variant = pickDeath({ finisher: !!a.finisher, kind, gore: G.settings.gore });
-    this.deathVariant = variant;
-    const deathDur = this.death.start(variant, att, def);
+    // Win the fight 2-0 (flawless in rounds) and the loser gets HUMILIATED.
+    const whitewash = !this.attract && att === this.p1 && this.need >= 2 && this.wins[0] === this.need - 1 && this.wins[1] === 0;
+    let deathDur;
+    if (whitewash || HUM_DEBUG.force) {
+      this.humiliated = pickHumiliation();
+      deathDur = this.hum.start(this.humiliated, att, def);
+    } else {
+      const variant = pickDeath({ finisher: !!a.finisher, kind, gore: G.settings.gore });
+      this.deathVariant = variant;
+      deathDur = this.death.start(variant, att, def);
+    }
     this.endRound?.({ winner: att, loser: def, deathDur });
   }
 
@@ -610,8 +626,9 @@ export class Fight {
 
   // ------------------------------------------------------------ replay
   async replay(deathDur = 1.5) {
-    const from = this.koTime - 1.1;
-    const to = this.koTime + Math.min(deathDur, 2.8);
+    const hum = !!this.humiliated;
+    const from = hum ? this.koTime + this.hum.replayFrom : this.koTime - 1.1;
+    const to = hum ? this.koTime + deathDur - 0.3 : this.koTime + Math.min(deathDur, 2.8);
     const frames = this.frames.filter((f) => f.t >= from && f.t <= to);
     if (frames.length < 10) return;
     const { p1, p2 } = this;
@@ -624,7 +641,9 @@ export class Fight {
     const loser = p1.health <= 0 ? p1 : p2;
     hud.letterbox(true);
     hud.replayTag(true);
-    G.cam.set('replay', { target: loser, cut: true });
+    document.querySelector('#replay-tag').textContent = hum ? '● HUMILIATION REPLAY' : '● REPLAY';
+    if (hum && frames[0].cam) G.cam.shot(frames[0].cam[0].clone(), frames[0].cam[1].clone(), 30, true);
+    else G.cam.set('replay', { target: loser, cut: true });
     G.fx.clearDecals();
     await this.wait((done) => {
       this.replaying = { frames, i: 0, t: from, to, events: this.events.filter((e) => e.t >= from && e.t <= to), ei: 0, done };
@@ -637,6 +656,9 @@ export class Fight {
     const last = frames[frames.length - 1];
     p1.cur.set(last.a);
     p2.cur.set(last.b);
+    if (last.xa) { p1.setXform(last.xa); p2.setXform(last.xb); }
+    this.hum.applySnapshot(last.props);
+    for (const name of [...this.hum.overlays]) this.hum.setOverlay(name, false);
     hud.letterbox(false);
     hud.replayTag(false);
   }
@@ -648,7 +670,7 @@ export class Fight {
   updateReplay(rdt) {
     const r = this.replaying;
     // slow build-up, then (almost) real time for the finisher
-    const speed = r.t < this.koTime ? 0.45 : 0.85;
+    const speed = this.humiliated ? 0.9 : r.t < this.koTime ? 0.45 : 0.85;
     r.t += rdt * speed;
     while (r.i < r.frames.length - 1 && r.frames[r.i + 1].t <= r.t) r.i++;
     const f = r.frames[r.i];
@@ -662,6 +684,9 @@ export class Fight {
         obj.quaternion.copy(quat);
       }
     }
+    if (f.xa) { p1.setXform(f.xa); p2.setXform(f.xb); }
+    this.hum.applySnapshot(f.props);
+    if (this.humiliated && f.cam) { G.cam.shotPos.copy(f.cam[0]); G.cam.shotLook.copy(f.cam[1]); }
     p1.cur.set(f.a); p1.time = f.ta; p1.flash = f.fa; p1.apply(p1.cur);
     p2.cur.set(f.b); p2.time = f.tb; p2.flash = f.fb; p2.apply(p2.cur);
     while (r.ei < r.events.length && r.events[r.ei].t <= r.t) {
@@ -684,11 +709,19 @@ export class Fight {
     p1.update(dt);
     p2.update(dt);
     this.death.update(dt, true);
+    this.hum.update(dt);
     const ph = this.phase;
 
     if (ph === 'fight' || ph === 'ko' || ph === 'rush' || ph === 'cinematic' || ph === 'parry') {
-      this.frames.push({ t: T.now, a: p1.cur.slice(), b: p2.cur.slice(), ta: p1.time, tb: p2.time, fa: p1.flash, fb: p2.flash, parts: this.death.snapshot(p1, p2) });
-      while (this.frames.length && this.frames[0].t < T.now - 7) this.frames.shift();
+      const hum = this.hum.active;
+      this.frames.push({
+        t: T.now, a: p1.cur.slice(), b: p2.cur.slice(), ta: p1.time, tb: p2.time, fa: p1.flash, fb: p2.flash,
+        parts: this.death.snapshot(p1, p2),
+        xa: hum ? p1.snapXform() : null, xb: hum ? p2.snapXform() : null,
+        props: hum ? this.hum.snapshot() : null,
+        cam: hum ? [G.cam.pos.clone(), G.cam.look.clone()] : null,
+      });
+      while (this.frames.length && this.frames[0].t < T.now - 12) this.frames.shift();
     }
 
     // auras + drips
