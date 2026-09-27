@@ -9,7 +9,8 @@ const PORT = 4173;
 export default defineConfig({
   testDir: './e2e',
   // The game renders WebGL in software (SwiftShader) on headless CI, so it's slow.
-  timeout: 90_000,
+  // Tests also force Retro graphics and a small viewport (see e2e/fixtures.js).
+  timeout: 180_000,
   expect: { timeout: 15_000 },
   fullyParallel: true,
   workers: process.env.CI ? 1 : '50%',
@@ -19,6 +20,7 @@ export default defineConfig({
     baseURL: external || `http://localhost:${PORT}`,
     actionTimeout: 10_000,
     locale: 'en-GB',
+    viewport: { width: 800, height: 450 },
     // Let the game's Web Audio start without a real user gesture.
     launchOptions: { args: ['--autoplay-policy=no-user-gesture-required', '--enable-unsafe-swiftshader'] },
   },

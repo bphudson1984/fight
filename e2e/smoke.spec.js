@@ -40,7 +40,7 @@ test('coin → start → settings → select → fight, answer a question', asyn
   await expect.poll(() => page.evaluate(() => {
     const q = window.__game.fight?.q;
     return q && !q.locked && q.mode === 'normal' ? q.q.answer : null;
-  }), { timeout: 30_000 }).not.toBeNull();
+  }), { timeout: 90_000 }).not.toBeNull();
   const answer = await page.evaluate(() => window.__game.fight.q.q.answer);
   await page.keyboard.type(String(answer)); // auto-submits once enough digits are typed
 

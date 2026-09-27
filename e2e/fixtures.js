@@ -4,6 +4,9 @@ import { test as base, expect } from '@playwright/test';
 // that leaves the origin (the game must work on offline school networks).
 export const test = base.extend({
   page: async ({ page, baseURL }, use) => {
+    // Retro PS1 graphics: headless CI renders WebGL in software, and HD mode is
+    // too heavy for it (the game clock crawls and input stalls).
+    await page.addInitScript(() => { try { localStorage.setItem('mathsfist.quality', 'retro'); } catch { /* ignore */ } });
     const problems = [];
     const origin = new URL(baseURL).origin;
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
